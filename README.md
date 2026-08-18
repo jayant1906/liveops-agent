@@ -19,7 +19,7 @@ Create `backend/.env` with:
 APP_NAME=LiveOps Agent
 APP_ENV=development
 API_PREFIX=/api
-DATABASE_URL=postgresql+psycopg2://postgres:postgres@localhost:5432/liveops
+DATABASE_URL=postgresql+psycopg2:///liveops
 CORS_ORIGINS=http://localhost:5173
 ```
 

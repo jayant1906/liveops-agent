@@ -16,7 +16,7 @@ class Settings:
     api_prefix: str = os.getenv("API_PREFIX", "/api")
     database_url: str = os.getenv(
         "DATABASE_URL",
-        "postgresql+psycopg2://postgres:postgres@localhost:5432/liveops",
+        "postgresql+psycopg2:///liveops",
     )
     cors_origins: tuple[str, ...] = tuple(
         origin.strip()

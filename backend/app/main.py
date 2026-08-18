@@ -1,8 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api import telemetry
 from app.config.settings import get_settings
-from app.database.connection import check_database_connection
+from app.database.connection import check_database_connection, create_database_tables
 from app.services import order_service, payment_service, user_service
 
 
@@ -23,6 +24,11 @@ app.add_middleware(
 )
 
 
+@app.on_event("startup")
+def startup() -> None:
+    create_database_tables()
+
+
 @app.get("/")
 def root() -> dict[str, str]:
     return {"name": settings.app_name, "environment": settings.app_env}
@@ -39,3 +45,4 @@ def health_check() -> dict[str, object]:
 app.include_router(user_service.router, prefix=settings.api_prefix)
 app.include_router(order_service.router, prefix=settings.api_prefix)
 app.include_router(payment_service.router, prefix=settings.api_prefix)
+app.include_router(telemetry.router, prefix=settings.api_prefix)
