@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import telemetry
+from app.api import deployments, telemetry
 from app.config.settings import get_settings
 from app.database.connection import check_database_connection, create_database_tables
 from app.services import order_service, payment_service, user_service
@@ -45,4 +45,5 @@ def health_check() -> dict[str, object]:
 app.include_router(user_service.router, prefix=settings.api_prefix)
 app.include_router(order_service.router, prefix=settings.api_prefix)
 app.include_router(payment_service.router, prefix=settings.api_prefix)
+app.include_router(deployments.router, prefix=settings.api_prefix)
 app.include_router(telemetry.router, prefix=settings.api_prefix)
