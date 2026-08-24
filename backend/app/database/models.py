@@ -35,3 +35,15 @@ class EventRecord(Base):
     message = Column(String, nullable=False)
     request_id = Column(String, nullable=True)
 
+
+class Incident(Base):
+    __tablename__ = "incidents"
+    id = Column(Integer, primary_key=True, index=True)
+    timestamp = Column(DateTime, nullable=False)
+    service = Column(String, nullable=False)
+    incident_type = Column(String, nullable=False)
+    severity = Column(String, nullable=False)
+    message = Column(String, nullable=False)
+    status = Column(String, nullable=False)
+    metric_value = Column(Float, nullable=False)
+    threshold = Column(Float, nullable=False)
