@@ -1,15 +1,25 @@
 # LiveOps Agent
 
-Day 1 backend for a LiveOps incident-response project.
+LiveOps Agent is an incident-response project with a FastAPI backend, a React frontend, and a curated knowledge base for retrieval-backed diagnosis and remediation.
 
-## Run The Backend
+## Setup
+
+Use a project virtual environment instead of the Homebrew-managed system Python:
 
 ```bash
-source venv/bin/activate
-uvicorn app.main:app --reload --app-dir backend
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r backend/requirements.txt
 ```
 
-The API runs at `http://127.0.0.1:8000`.
+In VS Code, select the same interpreter:
+
+```text
+Cmd+Shift+P -> Python: Select Interpreter -> ./.venv/bin/python
+```
+
+If Pylance still shows missing imports, run `Pylance: Restart Language Server`.
 
 ## Environment
 
@@ -23,6 +33,48 @@ DATABASE_URL=postgresql+psycopg2:///liveops
 CORS_ORIGINS=http://localhost:5173
 ```
 
-## Day 1 Flow
+## Run The Backend
 
-Frontend calls FastAPI routes, FastAPI delegates to service modules, and the health endpoint verifies database connectivity.
+```bash
+source .venv/bin/activate
+uvicorn app.main:app --reload --app-dir backend
+```
+
+The API runs at `http://127.0.0.1:8000`.
+
+## Knowledge Base
+
+The repository includes a small retrieval knowledge base:
+
+- `knowledge_base/runbooks/`: operational runbooks
+- `knowledge_base/architecture/`: system and dependency notes
+- `knowledge_base/incidents/`: historical incidents with similar but not identical failures
+
+To regenerate the JSONL chunks used by retrieval:
+
+```bash
+source .venv/bin/activate
+python backend/scripts/ingest_documents.py
+```
+
+The ingestion pipeline is:
+
+```text
+load -> clean -> chunk -> metadata -> write
+```
+
+Output is written to:
+
+```text
+backend/data/knowledge_chunks.jsonl
+```
+
+You can override paths or chunk settings:
+
+```bash
+python backend/scripts/ingest_documents.py \
+  --knowledge-base-path knowledge_base \
+  --output-path backend/data/knowledge_chunks.jsonl \
+  --chunk-size 50 \
+  --chunk-overlap 5
+```
