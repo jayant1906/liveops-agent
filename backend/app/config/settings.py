@@ -14,6 +14,8 @@ class Settings:
     app_name: str = os.getenv("APP_NAME", "LiveOps Agent")
     app_env: str = os.getenv("APP_ENV", "development")
     api_prefix: str = os.getenv("API_PREFIX", "/api")
+    embedding_model: str = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
+    embedding_device: str | None = os.getenv("EMBEDDING_DEVICE")
     database_url: str = os.getenv(
         "DATABASE_URL",
         "postgresql+psycopg2:///liveops",
