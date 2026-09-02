@@ -78,3 +78,31 @@ python backend/scripts/ingest_documents.py \
   --chunk-size 50 \
   --chunk-overlap 5
 ```
+
+## Vector Retrieval
+
+Day 6 retrieval lives in:
+
+- `backend/app/retrieval/embeddings.py`
+- `backend/app/retrieval/vector_store.py`
+- `backend/tests/test_vector_retrieval.py`
+
+The retrieval flow is:
+
+```text
+documents -> embeddings -> FAISS index -> semantic search -> ranked metadata
+```
+
+Run the focused retrieval test from the project root:
+
+```bash
+.venv/bin/python -m unittest -v backend/tests/test_vector_retrieval.py
+```
+
+The test indexes four small fake documents, searches for:
+
+```text
+payment service database connection pool exhausted
+```
+
+and verifies that payment/database documents rank above unrelated authentication and cache documents. The printed score is FAISS L2 distance, so lower is more relevant.
