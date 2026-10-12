@@ -2,11 +2,22 @@ from typing import Optional
 
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
+from app.agent.pipeline import incident_to_dict, investigate_incident
+from app.database.connection import SessionLocal
+from app.database.repository import TelemetryRepository
+from app.detection.detector import detect_incidents
 
 from app.failures import bad_deployment, database_failure, dependency_failure, memory_leak, slow_database
+from app.telemetry.events import EventRecorder
+from app.telemetry.logger import StructuredLogger
+from app.telemetry.metrics import MetricsCollector
 
 
 router = APIRouter(prefix="/failures", tags=["failures"])
+event_recorder = EventRecorder()
+logger = StructuredLogger()
+metrics_collector = MetricsCollector()
+repository = TelemetryRepository()
 
 
 class FailureRequest(BaseModel):
@@ -33,7 +44,62 @@ class BadDeploymentFailureRequest(FailureRequest):
 @router.post("/database")
 def trigger_database_failure(failure_request: FailureRequest):
     database_failure.trigger_database_failure(request_id=failure_request.request_id)
-    return {"status": "failure_injected", "failure": "database"}
+
+    db = SessionLocal()
+    try:
+        repository.save_event(
+            db,
+            event_recorder.deployment(
+                service="payment-service",
+                message="Deployed version v2.4.0",
+                request_id=failure_request.request_id,
+            ),
+        )
+        repository.save_log(
+            db,
+            logger.error(
+                service="payment-service",
+                message="Database connection pool exhausted after deployment",
+                request_id=failure_request.request_id,
+            ),
+        )
+        repository.save_metric(
+            db,
+            metrics_collector.record_error_rate(
+                service="payment-service",
+                value=31,
+            ),
+        )
+        repository.save_metric(
+            db,
+            metrics_collector.record_db_connections(
+                service="payment-service",
+                value=100,
+            ),
+        )
+        repository.save_event(
+            db,
+            event_recorder.failure_injected(
+                service="payment-service",
+                message="Database connection failure injected",
+                request_id=failure_request.request_id,
+            ),
+        )
+
+        incidents = detect_incidents(db)
+        investigations = [
+            investigate_incident(incident, db)
+            for incident in incidents
+        ]
+
+        return {
+            "status": "failure_injected",
+            "failure": "database",
+            "incidents": [incident_to_dict(incident) for incident in incidents],
+            "investigations": investigations,
+        }
+    finally:
+        db.close()
 
 
 @router.post("/slow-db")
