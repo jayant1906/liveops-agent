@@ -106,3 +106,215 @@ payment service database connection pool exhausted
 ```
 
 and verifies that payment/database documents rank above unrelated authentication and cache documents. The printed score is FAISS L2 distance, so lower is more relevant.
+
+## System Architecture
+
+The backend is organized around an incident-response pipeline:
+
+```text
+Service request or failure injection
+        ↓
+Telemetry persisted to the database
+        ↓
+Threshold-based incident detection
+        ↓
+LangGraph investigation workflow
+        ↓
+Logs + metrics + deployments + dependencies
+        ↓
+BM25 + vector retrieval + CrossEncoder reranking
+        ↓
+Hypothesis scoring and diagnosis
+        ↓
+Recommended remediation
+```
+
+The current agent workflow is:
+
+```text
+Investigate
+    ↓
+Generate hypotheses
+    ↓
+Evaluate hypotheses
+    ↓
+Diagnosis
+```
+
+The agent does not execute remediation. It returns a recommendation with
+`execute: false` so a human can review it first.
+
+## Telemetry and Services
+
+The simulated services are available under the `/api` prefix:
+
+```text
+GET /api/users/
+GET /api/orders/
+GET /api/payments/
+```
+
+Telemetry can be written and inspected through:
+
+```text
+GET  /api/telemetry/logs
+POST /api/telemetry/logs
+GET  /api/telemetry/metrics
+POST /api/telemetry/metrics
+GET  /api/telemetry/events
+POST /api/telemetry/events
+```
+
+## Failure Injection
+
+Available failure endpoints:
+
+```text
+POST /api/failures/database
+POST /api/failures/slow-db
+POST /api/failures/memory
+POST /api/failures/dependency
+POST /api/failures/deployment
+```
+
+The database failure endpoint is the complete Day 9 demonstration path. It
+records a recent payment-service deployment, an error log, a 31% error rate,
+100 database connections, and a failure event. It then detects incidents and
+automatically starts the investigation workflow.
+
+## Day 9 Demo
+
+Start the backend:
+
+```bash
+source .venv/bin/activate
+uvicorn app.main:app --reload --app-dir backend
+```
+
+Trigger the complete pipeline:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/failures/database
+```
+
+The response contains:
+
+- created incidents;
+- collected logs, metrics, deployments, dependencies, and historical incidents;
+- BM25/vector/RAG results;
+- reranked knowledge-base results;
+- scored hypotheses;
+- the final diagnosis;
+- a recommended rollback that is not executed automatically.
+
+The expected diagnosis is similar to:
+
+```text
+A database connection leak associated with the recent payment-service
+deployment is the most likely cause.
+```
+
+The expected recommendation is similar to:
+
+```json
+{
+  "action": "rollback_deployment",
+  "service": "payment-service",
+  "execute": false
+}
+```
+
+The first request may take longer because the embedding model and CrossEncoder
+model are initialized and the knowledge chunks are added to the vector index.
+
+## Agent Tools
+
+The agent tools are defined in `backend/app/agent/tools.py`:
+
+- `get_logs()`
+- `get_metrics()`
+- `get_deployments()`
+- `search_knowledge_base()`
+- `search_historical_incidents()`
+- `get_service_dependencies()`
+
+The tools are exposed through `AGENT_TOOLS`, and the investigation graph is
+created with:
+
+```python
+from app.agent.graph import run_investigation
+
+result = run_investigation(incident, db, knowledge_searcher)
+```
+
+## Retrieval Evaluation
+
+The hybrid search implementation supports these three modes:
+
+```text
+Vector only
+BM25 + Vector
+BM25 + Vector + CrossEncoder reranker
+```
+
+The knowledge-base searcher is initialized by
+`backend/app/retrieval/knowledge_base.py`. It loads
+`backend/data/knowledge_chunks.jsonl`, builds the FAISS index, and connects the
+index to BM25 and the CrossEncoder reranker.
+
+## Incident Detection
+
+Detection currently checks the latest values for:
+
+- error rate above `10.0`;
+- latency above `1000.0 ms`;
+- database connections above `90.0`.
+
+Detection can also be run directly through:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/incidents/detect
+```
+
+## Project Structure
+
+```text
+backend/app/
+├── agent/
+│   ├── graph.py
+│   ├── investigator.py
+│   ├── diagnostician.py
+│   ├── state.py
+│   └── tools.py
+├── detection/
+├── failures/
+├── retrieval/
+│   ├── bm25.py
+│   ├── embeddings.py
+│   ├── hybrid_search.py
+│   ├── knowledge_base.py
+│   ├── reranker.py
+│   └── vector_store.py
+├── database/
+├── services/
+└── api/
+```
+
+## Verification
+
+Run the focused vector retrieval test:
+
+```bash
+.venv/bin/python -m unittest -v backend/tests/test_vector_retrieval.py
+```
+
+Run syntax checks across the backend:
+
+```bash
+.venv/bin/python -m compileall -q backend/app
+```
+
+For a complete manual verification, run the backend and use the Day 9 demo
+endpoint above. This requires the dependencies in `backend/requirements.txt`,
+a working database configured through `DATABASE_URL`, and access to the
+embedding and CrossEncoder model weights.

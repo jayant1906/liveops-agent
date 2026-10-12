@@ -42,8 +42,9 @@ class BadDeploymentFailureRequest(FailureRequest):
 
 
 @router.post("/database")
-def trigger_database_failure(failure_request: FailureRequest):
-    database_failure.trigger_database_failure(request_id=failure_request.request_id)
+def trigger_database_failure(failure_request: FailureRequest | None = None):
+    request_id = failure_request.request_id if failure_request else None
+    database_failure.trigger_database_failure(request_id=request_id)
 
     db = SessionLocal()
     try:
@@ -52,7 +53,7 @@ def trigger_database_failure(failure_request: FailureRequest):
             event_recorder.deployment(
                 service="payment-service",
                 message="Deployed version v2.4.0",
-                request_id=failure_request.request_id,
+                request_id=request_id,
             ),
         )
         repository.save_log(
@@ -60,7 +61,7 @@ def trigger_database_failure(failure_request: FailureRequest):
             logger.error(
                 service="payment-service",
                 message="Database connection pool exhausted after deployment",
-                request_id=failure_request.request_id,
+                request_id=request_id,
             ),
         )
         repository.save_metric(
@@ -82,7 +83,7 @@ def trigger_database_failure(failure_request: FailureRequest):
             event_recorder.failure_injected(
                 service="payment-service",
                 message="Database connection failure injected",
-                request_id=failure_request.request_id,
+                request_id=request_id,
             ),
         )
 
