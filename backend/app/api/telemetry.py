@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.database.connection import get_db
 from app.database.repository import TelemetryRepository
+from app.detection.detector import detect_incidents
 from app.telemetry.events import EventRecorder, EventType
 from app.telemetry.logger import LogLevel, StructuredLogger
 from app.telemetry.metrics import MetricName, MetricsCollector
@@ -123,7 +124,10 @@ def create_metric(metric_request: CreateMetricRequest, db: Session = Depends(get
     else:
         raise HTTPException(status_code=400, detail="Invalid metric name")
 
-    return repository.save_metric(db, metric_point)
+    metric_record = repository.save_metric(db, metric_point)
+    # Detection is part of ingestion so callers do not need a second request.
+    detect_incidents(db)
+    return metric_record
 
 
 @router.get("/events")

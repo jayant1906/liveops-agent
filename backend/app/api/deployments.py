@@ -4,6 +4,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field
 from app.agent.pipeline import incident_to_dict, investigate_incident
 from app.database.connection import SessionLocal
+from app.database.models import Incident
 from app.database.repository import TelemetryRepository
 from app.detection.detector import detect_incidents
 
@@ -88,6 +89,26 @@ def trigger_database_failure(failure_request: FailureRequest | None = None):
         )
 
         incidents = detect_incidents(db)
+        if not incidents:
+            # An already-open incident is intentionally deduplicated by detection,
+            # but the demo should still return its diagnosis and recommendation.
+            existing = (
+                db.query(Incident)
+                .filter(
+                    Incident.service == "payment-service",
+                    Incident.status.in_(["open", "acknowledged"]),
+                )
+                .order_by(Incident.timestamp.desc())
+                .all()
+            )
+            seen_types = set()
+            incidents = []
+            for incident in existing:
+                if incident.incident_type not in seen_types:
+                    incidents.append(incident)
+                    seen_types.add(incident.incident_type)
+                if len(seen_types) == 3:
+                    break
         investigations = [
             investigate_incident(incident, db)
             for incident in incidents

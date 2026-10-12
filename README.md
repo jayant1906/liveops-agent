@@ -30,7 +30,7 @@ APP_NAME=LiveOps Agent
 APP_ENV=development
 API_PREFIX=/api
 DATABASE_URL=postgresql+psycopg2:///liveops
-CORS_ORIGINS=http://localhost:5173
+CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 ```
 
 ## Run The Backend
@@ -41,6 +41,20 @@ uvicorn app.main:app --reload --app-dir backend
 ```
 
 The API runs at `http://127.0.0.1:8000`.
+
+## Run The Frontend
+
+In a second terminal:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+The dashboard runs at `http://127.0.0.1:5173`. It displays active incidents
+and recent telemetry, refreshes automatically, and includes a failure-demo
+button for testing the incident flow.
 
 ## Knowledge Base
 
@@ -164,6 +178,10 @@ POST /api/telemetry/metrics
 GET  /api/telemetry/events
 POST /api/telemetry/events
 ```
+
+Posting a metric through `POST /api/telemetry/metrics` also runs threshold
+detection automatically. Existing open incidents are deduplicated, so repeated
+threshold breaches do not create duplicate alerts.
 
 ## Failure Injection
 
